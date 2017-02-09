@@ -9,16 +9,25 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const diag = vscode.languages.createDiagnosticCollection('ruby');
     const rubocopAutocorrect = new RubocopAutocorrect(diag);
+    let autocorrect = (document) => {
+        rubocopAutocorrect.execute(document)
+            .addListener('exit', () => {
+                rubocop.execute(document).on('exit', () => {
+                    vscode.commands.executeCommand("workbench.action.files.save");
+                })
+            });
+    }
     vscode.commands.registerCommand('ruby.rubocopAutocorrect', () => {
         const document = vscode.window.activeTextEditor.document;
         if (document.languageId !== 'ruby') {
             return;
         }
 
-        document.save().then(() => {
-            rubocopAutocorrect.execute(document)
-                .addListener('close', () => rubocop.execute(document));
-        });
+        if (document.isDirty) {
+            document.save().then(() => autocorrect(document));
+        } else {
+            autocorrect(document)
+        }
     });
 
     context.subscriptions.push(diag);
